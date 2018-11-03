@@ -7,6 +7,7 @@ import (
 
 	"v2ray.com/core/common"
 	"v2ray.com/core/common/protocol"
+	"v2ray.com/core/common/serial"
 	"v2ray.com/core/common/task"
 )
 
@@ -56,14 +57,15 @@ func NewTimedUserValidator(hasher protocol.IDHash) *TimedUserValidator {
 
 func (v *TimedUserValidator) generateNewHashes(nowSec protocol.Timestamp, user *user) {
 	var hashValue [16]byte
+	genEndSec := nowSec + cacheDurationSec
 	genHashForID := func(id *protocol.ID) {
 		idHash := v.hasher(id.Bytes())
-		lastSec := user.lastSec
-		if lastSec < nowSec-cacheDurationSec*2 {
-			lastSec = nowSec - cacheDurationSec*2
+		genBeginSec := user.lastSec
+		if genBeginSec < nowSec-cacheDurationSec {
+			genBeginSec = nowSec - cacheDurationSec
 		}
-		for ts := lastSec; ts <= nowSec; ts++ {
-			common.Must2(idHash.Write(ts.Bytes(nil)))
+		for ts := genBeginSec; ts <= genEndSec; ts++ {
+			common.Must2(serial.WriteUint64(idHash, uint64(ts)))
 			idHash.Sum(hashValue[:0])
 			idHash.Reset()
 
@@ -80,7 +82,7 @@ func (v *TimedUserValidator) generateNewHashes(nowSec protocol.Timestamp, user *
 	for _, id := range account.AlterIDs {
 		genHashForID(id)
 	}
-	user.lastSec = nowSec
+	user.lastSec = genEndSec
 }
 
 func (v *TimedUserValidator) removeExpiredHashes(expire uint32) {
@@ -93,7 +95,7 @@ func (v *TimedUserValidator) removeExpiredHashes(expire uint32) {
 
 func (v *TimedUserValidator) updateUserHash() {
 	now := time.Now()
-	nowSec := protocol.Timestamp(now.Unix() + cacheDurationSec)
+	nowSec := protocol.Timestamp(now.Unix())
 	v.Lock()
 	defer v.Unlock()
 
@@ -118,7 +120,7 @@ func (v *TimedUserValidator) Add(u *protocol.MemoryUser) error {
 		lastSec: protocol.Timestamp(nowSec - cacheDurationSec),
 	}
 	v.users = append(v.users, uu)
-	v.generateNewHashes(protocol.Timestamp(nowSec+cacheDurationSec), uu)
+	v.generateNewHashes(protocol.Timestamp(nowSec), uu)
 
 	return nil
 }

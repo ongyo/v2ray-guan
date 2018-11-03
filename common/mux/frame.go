@@ -1,6 +1,7 @@
 package mux
 
 import (
+	"encoding/binary"
 	"io"
 
 	"v2ray.com/core/common"
@@ -60,11 +61,11 @@ type FrameMetadata struct {
 }
 
 func (f FrameMetadata) WriteTo(b *buf.Buffer) error {
-	lenBytes := b.Bytes()
 	common.Must2(b.WriteBytes(0x00, 0x00))
+	lenBytes := b.Bytes()
 
 	len0 := b.Len()
-	if err := b.AppendSupplier(serial.WriteUint16(f.SessionID)); err != nil {
+	if _, err := serial.WriteUint16(b, f.SessionID); err != nil {
 		return err
 	}
 
@@ -84,7 +85,7 @@ func (f FrameMetadata) WriteTo(b *buf.Buffer) error {
 	}
 
 	len1 := b.Len()
-	serial.Uint16ToBytes(uint16(len1-len0), lenBytes)
+	binary.BigEndian.PutUint16(lenBytes, uint16(len1-len0))
 	return nil
 }
 
@@ -101,7 +102,7 @@ func (f *FrameMetadata) Unmarshal(reader io.Reader) error {
 	b := buf.New()
 	defer b.Release()
 
-	if err := b.Reset(buf.ReadFullFrom(reader, int32(metaLen))); err != nil {
+	if _, err := b.ReadFullFrom(reader, int32(metaLen)); err != nil {
 		return err
 	}
 	return f.UnmarshalFromBuffer(b)
@@ -114,7 +115,7 @@ func (f *FrameMetadata) UnmarshalFromBuffer(b *buf.Buffer) error {
 		return newError("insufficient buffer: ", b.Len())
 	}
 
-	f.SessionID = serial.BytesToUint16(b.BytesTo(2))
+	f.SessionID = binary.BigEndian.Uint16(b.BytesTo(2))
 	f.SessionStatus = SessionStatus(b.Byte(2))
 	f.Option = bitmask.Byte(b.Byte(3))
 	f.Target.Network = net.Network_Unknown

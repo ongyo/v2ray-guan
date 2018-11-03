@@ -3,6 +3,8 @@ package encoding
 import (
 	"crypto/md5"
 	"crypto/rand"
+	"encoding/binary"
+	"hash"
 	"hash/fnv"
 	"io"
 
@@ -18,13 +20,12 @@ import (
 	"v2ray.com/core/proxy/vmess"
 )
 
-func hashTimestamp(t protocol.Timestamp) []byte {
-	bytes := make([]byte, 0, 32)
-	bytes = t.Bytes(bytes)
-	bytes = t.Bytes(bytes)
-	bytes = t.Bytes(bytes)
-	bytes = t.Bytes(bytes)
-	return bytes
+func hashTimestamp(h hash.Hash, t protocol.Timestamp) []byte {
+	serial.WriteUint64(h, uint64(t))
+	serial.WriteUint64(h, uint64(t))
+	serial.WriteUint64(h, uint64(t))
+	serial.WriteUint64(h, uint64(t))
+	return h.Sum(nil)
 }
 
 // ClientSession stores connection session info for VMess client.
@@ -58,7 +59,7 @@ func (c *ClientSession) EncodeRequestHeader(header *protocol.RequestHeader, writ
 	timestamp := protocol.NewTimestampGenerator(protocol.NowTime(), 30)()
 	account := header.User.Account.(*vmess.MemoryAccount)
 	idHash := c.idHash(account.AnyValidID().Bytes())
-	common.Must2(idHash.Write(timestamp.Bytes(nil)))
+	common.Must2(serial.WriteUint64(idHash, uint64(timestamp)))
 	common.Must2(writer.Write(idHash.Sum(nil)))
 
 	buffer := buf.New()
@@ -80,16 +81,17 @@ func (c *ClientSession) EncodeRequestHeader(header *protocol.RequestHeader, writ
 	}
 
 	if padingLen > 0 {
-		common.Must(buffer.AppendSupplier(buf.ReadFullFrom(rand.Reader, int32(padingLen))))
+		common.Must2(buffer.ReadFullFrom(rand.Reader, int32(padingLen)))
 	}
 
 	{
 		fnv1a := fnv.New32a()
 		common.Must2(fnv1a.Write(buffer.Bytes()))
-		common.Must(buffer.AppendSupplier(serial.WriteHash(fnv1a)))
+		hashBytes := buffer.Extend(int32(fnv1a.Size()))
+		fnv1a.Sum(hashBytes[:0])
 	}
 
-	iv := md5.Sum(hashTimestamp(timestamp))
+	iv := hashTimestamp(md5.New(), timestamp)
 	aesStream := crypto.NewAesEncryptionStream(account.ID.CmdKey(), iv[:])
 	aesStream.XORKeyStream(buffer.Bytes(), buffer.Bytes())
 	common.Must2(writer.Write(buffer.Bytes()))
@@ -164,7 +166,7 @@ func (c *ClientSession) DecodeResponseHeader(reader io.Reader) (*protocol.Respon
 	buffer := buf.New()
 	defer buffer.Release()
 
-	if err := buffer.AppendSupplier(buf.ReadFullFrom(c.responseReader, 4)); err != nil {
+	if _, err := buffer.ReadFullFrom(c.responseReader, 4); err != nil {
 		return nil, newError("failed to read response header").Base(err)
 	}
 
@@ -180,7 +182,8 @@ func (c *ClientSession) DecodeResponseHeader(reader io.Reader) (*protocol.Respon
 		cmdID := buffer.Byte(2)
 		dataLen := int32(buffer.Byte(3))
 
-		if err := buffer.Reset(buf.ReadFullFrom(c.responseReader, dataLen)); err != nil {
+		buffer.Clear()
+		if _, err := buffer.ReadFullFrom(c.responseReader, dataLen); err != nil {
 			return nil, newError("failed to read response command").Base(err)
 		}
 		command, err := UnmarshalCommand(cmdID, buffer.Bytes())
@@ -257,7 +260,7 @@ func GenerateChunkNonce(nonce []byte, size uint32) crypto.BytesGenerator {
 	c := append([]byte(nil), nonce...)
 	count := uint16(0)
 	return func() []byte {
-		serial.Uint16ToBytes(count, c[:0])
+		binary.BigEndian.PutUint16(c, count)
 		count++
 		return c[:size]
 	}

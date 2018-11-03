@@ -66,7 +66,7 @@ func writeMetaWithFrame(writer buf.Writer, meta FrameMetadata, data buf.MultiBuf
 	if err := meta.WriteTo(frame); err != nil {
 		return err
 	}
-	if err := frame.AppendSupplier(serial.WriteUint16(uint16(data.Len()))); err != nil {
+	if _, err := serial.WriteUint16(frame, uint16(data.Len())); err != nil {
 		return err
 	}
 

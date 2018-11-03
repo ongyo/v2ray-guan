@@ -9,8 +9,8 @@ import (
 	"v2ray.com/core/common"
 	"v2ray.com/core/common/errors"
 	"v2ray.com/core/common/mux"
-	"v2ray.com/core/common/vio"
 	"v2ray.com/core/testing/mocks"
+	"v2ray.com/core/transport"
 	"v2ray.com/core/transport/pipe"
 )
 
@@ -35,7 +35,7 @@ func TestClientWorkerEOF(t *testing.T) {
 	reader, writer := pipe.New(pipe.WithoutSizeLimit())
 	common.Must(writer.Close())
 
-	worker, err := mux.NewClientWorker(vio.Link{Reader: reader, Writer: writer}, mux.ClientStrategy{})
+	worker, err := mux.NewClientWorker(transport.Link{Reader: reader, Writer: writer}, mux.ClientStrategy{})
 	common.Must(err)
 
 	time.Sleep(time.Millisecond * 500)
