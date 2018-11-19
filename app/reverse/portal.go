@@ -61,13 +61,13 @@ func (p *Portal) Close() error {
 	return p.ohm.RemoveHandler(context.Background(), p.tag)
 }
 
-func (s *Portal) HandleConnection(ctx context.Context, link *transport.Link) error {
+func (p *Portal) HandleConnection(ctx context.Context, link *transport.Link) error {
 	outboundMeta := session.OutboundFromContext(ctx)
 	if outboundMeta == nil {
 		return newError("outbound metadata not found").AtError()
 	}
 
-	if isDomain(outboundMeta.Target, s.domain) {
+	if isDomain(outboundMeta.Target, p.domain) {
 		muxClient, err := mux.NewClientWorker(*link, mux.ClientStrategy{})
 		if err != nil {
 			return newError("failed to create mux client worker").Base(err).AtWarning()
@@ -78,11 +78,11 @@ func (s *Portal) HandleConnection(ctx context.Context, link *transport.Link) err
 			return newError("failed to create portal worker").Base(err)
 		}
 
-		s.picker.AddWorker(worker)
+		p.picker.AddWorker(worker)
 		return nil
 	}
 
-	return s.client.Dispatch(ctx, link)
+	return p.client.Dispatch(ctx, link)
 }
 
 type Outbound struct {
@@ -251,8 +251,7 @@ func (w *PortalWorker) heartbeat() error {
 
 	b, err := proto.Marshal(msg)
 	common.Must(err)
-	var mb buf.MultiBuffer
-	common.Must2(mb.Write(b))
+	mb := buf.MergeBytes(nil, b)
 	return w.writer.WriteMultiBuffer(mb)
 }
 

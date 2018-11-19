@@ -17,10 +17,10 @@ func TestBytesReaderWriteTo(t *testing.T) {
 	pReader, pWriter := pipe.New(pipe.WithSizeLimit(1024))
 	reader := &BufferedReader{Reader: pReader}
 	b1 := New()
-	b1.WriteBytes('a', 'b', 'c')
+	b1.WriteString("abc")
 	b2 := New()
-	b2.WriteBytes('e', 'f', 'g')
-	assert(pWriter.WriteMultiBuffer(NewMultiBufferValue(b1, b2)), IsNil)
+	b2.WriteString("efg")
+	assert(pWriter.WriteMultiBuffer(MultiBuffer{b1, b2}), IsNil)
 	pWriter.Close()
 
 	pReader2, pWriter2 := pipe.New(pipe.WithSizeLimit(1024))
@@ -44,10 +44,10 @@ func TestBytesReaderMultiBuffer(t *testing.T) {
 	pReader, pWriter := pipe.New(pipe.WithSizeLimit(1024))
 	reader := &BufferedReader{Reader: pReader}
 	b1 := New()
-	b1.WriteBytes('a', 'b', 'c')
+	b1.WriteString("abc")
 	b2 := New()
-	b2.WriteBytes('e', 'f', 'g')
-	assert(pWriter.WriteMultiBuffer(NewMultiBufferValue(b1, b2)), IsNil)
+	b2.WriteString("efg")
+	assert(pWriter.WriteMultiBuffer(MultiBuffer{b1, b2}), IsNil)
 	pWriter.Close()
 
 	mbReader := NewReader(reader)
@@ -69,8 +69,7 @@ func TestReadByte(t *testing.T) {
 		t.Error("unexpected byte: ", b, " want a")
 	}
 
-	var mb MultiBuffer
-	nBytes, err := reader.WriteTo(&mb)
+	nBytes, err := reader.WriteTo(DiscardBytes)
 	common.Must(err)
 	if nBytes != 3 {
 		t.Error("unexpect bytes written: ", nBytes)

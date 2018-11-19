@@ -18,7 +18,7 @@ type BufferToBytesWriter struct {
 
 // WriteMultiBuffer implements Writer. This method takes ownership of the given buffer.
 func (w *BufferToBytesWriter) WriteMultiBuffer(mb MultiBuffer) error {
-	defer mb.Release()
+	defer ReleaseMulti(mb)
 
 	size := mb.Len()
 	if size == 0 {
@@ -134,15 +134,16 @@ func (w *BufferedWriter) WriteMultiBuffer(b MultiBuffer) error {
 		return w.writer.WriteMultiBuffer(b)
 	}
 
-	defer b.Release()
+	reader := MultiBufferContainer{
+		MultiBuffer: b,
+	}
+	defer reader.Close()
 
-	for !b.IsEmpty() {
+	for !reader.MultiBuffer.IsEmpty() {
 		if w.buffer == nil {
 			w.buffer = New()
 		}
-		if _, err := w.buffer.ReadFrom(&b); err != nil {
-			return err
-		}
+		common.Must2(w.buffer.ReadFrom(&reader))
 		if w.buffer.IsFull() {
 			if err := w.flushInternal(); err != nil {
 				return err
@@ -175,7 +176,7 @@ func (w *BufferedWriter) flushInternal() error {
 		return err
 	}
 
-	return w.writer.WriteMultiBuffer(NewMultiBufferValue(b))
+	return w.writer.WriteMultiBuffer(MultiBuffer{b})
 }
 
 // SetBuffered sets whether the internal buffer is used. If set to false, Flush() will be called to clear the buffer.
@@ -216,7 +217,7 @@ type SequentialWriter struct {
 
 // WriteMultiBuffer implements Writer.
 func (w *SequentialWriter) WriteMultiBuffer(mb MultiBuffer) error {
-	defer mb.Release()
+	defer ReleaseMulti(mb)
 
 	for _, b := range mb {
 		if b.IsEmpty() {
@@ -234,7 +235,7 @@ func (w *SequentialWriter) WriteMultiBuffer(mb MultiBuffer) error {
 type noOpWriter byte
 
 func (noOpWriter) WriteMultiBuffer(b MultiBuffer) error {
-	b.Release()
+	ReleaseMulti(b)
 	return nil
 }
 

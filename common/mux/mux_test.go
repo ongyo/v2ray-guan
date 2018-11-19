@@ -22,7 +22,7 @@ func readAll(reader buf.Reader) (buf.MultiBuffer, error) {
 		if err != nil {
 			return nil, err
 		}
-		mb.AppendMulti(b)
+		mb = append(mb, b...)
 	}
 	return mb, nil
 }
@@ -44,7 +44,7 @@ func TestReaderWriter(t *testing.T) {
 	writePayload := func(writer *Writer, payload ...byte) error {
 		b := buf.New()
 		b.Write(payload)
-		return writer.WriteMultiBuffer(buf.NewMultiBufferValue(b))
+		return writer.WriteMultiBuffer(buf.MultiBuffer{b})
 	}
 
 	assert(writePayload(writer, 'a', 'b', 'c', 'd'), IsNil)

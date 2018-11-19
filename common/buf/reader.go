@@ -46,10 +46,9 @@ func (r *BufferedReader) ReadByte() (byte, error) {
 // Read implements io.Reader. It reads from internal buffer first (if available) and then reads from the underlying reader.
 func (r *BufferedReader) Read(b []byte) (int, error) {
 	if !r.Buffer.IsEmpty() {
-		nBytes, err := r.Buffer.Read(b)
-		common.Must(err)
+		buffer, nBytes := SplitBytes(r.Buffer, b)
+		r.Buffer = buffer
 		if r.Buffer.IsEmpty() {
-			r.Buffer.Release()
 			r.Buffer = nil
 		}
 		return nBytes, nil
@@ -60,12 +59,11 @@ func (r *BufferedReader) Read(b []byte) (int, error) {
 		return 0, err
 	}
 
-	nBytes, err := mb.Read(b)
-	common.Must(err)
+	mb, nBytes := SplitBytes(mb, b)
 	if !mb.IsEmpty() {
 		r.Buffer = mb
 	}
-	return nBytes, err
+	return nBytes, nil
 }
 
 // ReadMultiBuffer implements Reader.
@@ -89,7 +87,8 @@ func (r *BufferedReader) ReadAtMost(size int32) (MultiBuffer, error) {
 		r.Buffer = mb
 	}
 
-	mb := r.Buffer.SliceBySize(size)
+	rb, mb := SplitSize(r.Buffer, size)
+	r.Buffer = rb
 	if r.Buffer.IsEmpty() {
 		r.Buffer = nil
 	}
@@ -123,7 +122,8 @@ func (r *BufferedReader) WriteTo(writer io.Writer) (int64, error) {
 // Close implements io.Closer.
 func (r *BufferedReader) Close() error {
 	if !r.Buffer.IsEmpty() {
-		r.Buffer.Release()
+		ReleaseMulti(r.Buffer)
+		r.Buffer = nil
 	}
 	return common.Close(r.Reader)
 }
@@ -139,5 +139,5 @@ func (r *SingleReader) ReadMultiBuffer() (MultiBuffer, error) {
 	if err != nil {
 		return nil, err
 	}
-	return NewMultiBufferValue(b), nil
+	return MultiBuffer{b}, nil
 }
