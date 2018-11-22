@@ -114,6 +114,14 @@ func (h *Handler) Dispatch(ctx context.Context, link *transport.Link) {
 	}
 }
 
+// Address implements internet.Dialer.
+func (h *Handler) Address() net.Address {
+	if h.senderSettings == nil || h.senderSettings.Via == nil {
+		return nil
+	}
+	return h.senderSettings.Via.AsAddress()
+}
+
 // Dial implements internet.Dialer.
 func (h *Handler) Dial(ctx context.Context, dest net.Destination) (internet.Connection, error) {
 	if h.senderSettings != nil {
@@ -145,11 +153,9 @@ func (h *Handler) Dial(ctx context.Context, dest net.Destination) (internet.Conn
 			}
 			outbound.Gateway = h.senderSettings.Via.AsAddress()
 		}
-
-		ctx = internet.ContextWithStreamSettings(ctx, h.streamSettings)
 	}
 
-	return internet.Dial(ctx, dest)
+	return internet.Dial(ctx, dest, h.streamSettings)
 }
 
 // GetOutbound implements proxy.GetOutbound.
