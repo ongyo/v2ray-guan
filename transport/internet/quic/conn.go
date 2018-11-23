@@ -7,8 +7,8 @@ import (
 	"time"
 
 	quic "github.com/lucas-clemente/quic-go"
-
 	"v2ray.com/core/common"
+	"v2ray.com/core/common/buf"
 	"v2ray.com/core/common/net"
 	"v2ray.com/core/transport/internet"
 )
@@ -140,6 +140,38 @@ type interConn struct {
 
 func (c *interConn) Read(b []byte) (int, error) {
 	return c.stream.Read(b)
+}
+
+func (c *interConn) WriteMultiBuffer(mb buf.MultiBuffer) error {
+	if mb.IsEmpty() {
+		return nil
+	}
+
+	if len(mb) == 1 {
+		_, err := c.Write(mb[0].Bytes())
+		buf.ReleaseMulti(mb)
+		return err
+	}
+
+	b := getBuffer()
+	defer putBuffer(b)
+
+	reader := buf.MultiBufferContainer{
+		MultiBuffer: mb,
+	}
+	defer reader.Close()
+
+	for {
+		nBytes, err := reader.Read(b[:1380])
+		if err != nil {
+			break
+		}
+		if _, err := c.Write(b[:nBytes]); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (c *interConn) Write(b []byte) (int, error) {
