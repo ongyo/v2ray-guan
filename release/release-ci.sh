@@ -73,12 +73,6 @@ popd
 # Take a snapshot of all required source code
 pushd $GOPATH/src
 
-# Flatten vendor directories
-cp -r v2ray.com/core/vendor/github.com/ .
-rm -rf v2ray.com/core/vendor/
-cp -r github.com/lucas-clemente/quic-go/vendor/github.com/ .
-rm -rf github.com/lucas-clemente/quic-go/vendor/
-
 # Create zip file for all sources
 zip -9 -r /v2/build/src_all.zip * -x '*.git*'
 popd
@@ -204,7 +198,7 @@ git add .
 git commit -m "Version ${RELEASE_TAG}"
 git tag -a "${RELEASE_TAG}" -m "Version ${RELEASE_TAG}"
 git remote add origin "https://${GITHUB_TOKEN}@github.com/v2ray/dist"
-git push -u --force origin master
+git push -u --force --follow-tags origin master
 
 fi
 
