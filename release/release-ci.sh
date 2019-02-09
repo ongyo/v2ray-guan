@@ -90,8 +90,9 @@ RELEASE_ID=$(curl --data "${JSON_DATA}" -H "Authorization: token ${GITHUB_TOKEN}
 function uploadfile() {
   FILE=$1
   CTYPE=$(file -b --mime-type $FILE)
-  curl -H "Authorization: token ${GITHUB_TOKEN}" -H "Content-Type: ${CTYPE}" --data-binary @$FILE "https://uploads.github.com/repos/v2ray/v2ray-core/releases/${RELEASE_ID}/assets?name=$(basename $FILE)"
 
+  sleep 1
+  curl -H "Authorization: token ${GITHUB_TOKEN}" -H "Content-Type: ${CTYPE}" --data-binary @$FILE "https://uploads.github.com/repos/v2ray/v2ray-core/releases/${RELEASE_ID}/assets?name=$(basename $FILE)"
   sleep 1
 }
 
@@ -193,6 +194,10 @@ cp ${ART_ROOT}/v2ray-openbsd-64.zip .
 cp ${ART_ROOT}/v2ray-openbsd-32.zip .
 cp ${ART_ROOT}/v2ray-dragonfly-64.zip .
 cp /v2/build/src_all.zip .
+cp "$GOPATH/src/v2ray.com/core/release/install-release.sh" ./install.sh
+
+sed -i "s/^NEW_VER=\"\"$/NEW_VER=\"${RELEASE_TAG}\"/" install.sh
+sed -i 's/^DIST_SRC=".*"$/DIST_SRC="jsdelivr"/' install.sh
 
 git add .
 git commit -m "Version ${RELEASE_TAG}"

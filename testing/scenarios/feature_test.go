@@ -441,8 +441,8 @@ func TestBlackhole(t *testing.T) {
 	common.Must(err)
 	defer CloseAllServers(servers)
 
-	if err := testTCPConn(serverPort2, 1024, time.Second*5)(); err != nil {
-		t.Error(err)
+	if err := testTCPConn(serverPort2, 1024, time.Second*5)(); err == nil {
+		t.Error("nil error")
 	}
 }
 
@@ -537,7 +537,7 @@ func TestUDPConnection(t *testing.T) {
 
 	servers, err := InitializeServerConfigs(clientConfig)
 	common.Must(err)
-	CloseAllServers(servers)
+	defer CloseAllServers(servers)
 
 	if err := testUDPConn(clientPort, 1024, time.Second*5)(); err != nil {
 		t.Error(err)
