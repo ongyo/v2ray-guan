@@ -218,21 +218,21 @@ func (h *Handler) handleIPQuery(id uint16, qType dnsmessage.Type, domain string,
 		ips, err = h.ipv6Lookup.LookupIPv6(domain)
 	}
 
-	if err != nil {
+	rcode := dns.RCodeFromError(err)
+	if rcode == 0 && len(ips) == 0 && err != dns.ErrEmptyResponse {
 		newError("ip query").Base(err).WriteToLog()
-		return
-	}
-
-	if len(ips) == 0 {
 		return
 	}
 
 	b := buf.New()
 	rawBytes := b.Extend(buf.Size)
 	builder := dnsmessage.NewBuilder(rawBytes[:0], dnsmessage.Header{
-		ID:       id,
-		RCode:    dnsmessage.RCodeSuccess,
-		Response: true,
+		ID:                 id,
+		RCode:              dnsmessage.RCode(rcode),
+		RecursionAvailable: true,
+		RecursionDesired:   true,
+		Response:           true,
+		Authoritative:      true,
 	})
 	builder.EnableCompression()
 	common.Must(builder.StartQuestions())
